@@ -147,7 +147,9 @@ int main(void)
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
 
   //baroinit — now on SPI1 (PA5/6/7) with CS on PA4, matching the working G474 setup
-  MS5607_Init(&hspi1, BARO_CS_GPIO_Port, BARO_CS_Pin);
+  if (MS5607_Init(&hspi1, BARO_CS_GPIO_Port, BARO_CS_Pin) != MS5607_STATE_READY) {
+      Error_Handler();
+  }
 
   //UART header
   const char *uartHeader = "timestamp_ms,pressure_pa,temperature_c,altitude_m,servo_deg\r\n";
@@ -180,7 +182,7 @@ int main(void)
 
 
 	  //Baro update
-      MS5607Update();\
+      MS5607Update();
       liveTelemetry.timestamp     = HAL_GetTick();
       liveTelemetry.pressure_pa   = MS5607GetPressurePa();
       liveTelemetry.temperature_c = MS5607GetTemperatureC();
@@ -188,7 +190,7 @@ int main(void)
       
       //live expression — append raw D1 (pressure ADC) and D2 (temperature ADC) for diagnosis
       int len = snprintf(uartTxBuffer, sizeof(uartTxBuffer),
-                            "%lu,%ld,%.2f,%.2f,%.2f,\r\n",
+                            "%lu,%ld,%.2f,%.2f,%.2f\r\n",
                             liveTelemetry.timestamp,
                             liveTelemetry.pressure_pa,
                             liveTelemetry.temperature_c,
@@ -492,7 +494,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 239;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 3029;
+  htim2.Init.Period = 19999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)

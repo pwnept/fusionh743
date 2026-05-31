@@ -80,6 +80,37 @@ static void sendCommand(uint8_t cmd)
     disableCSB();
 }
 
+static uint8_t MS5607_CRC4(struct promData *prom)
+{
+    uint16_t words[8];
+    uint16_t *promWords = (uint16_t *)prom;
+    for (int i = 0; i < 8; i++) {
+        words[i] = promWords[i];
+    }
+
+    unsigned int n_rem = 0;
+    words[7] = words[7] & 0xFF00; // zero out the CRC byte for calculation
+
+    for (int cnt = 0; cnt < 16; cnt++) {
+        if (cnt % 2 == 1) {
+            n_rem ^= (unsigned short)(words[cnt >> 1] & 0x00FF);
+        } else {
+            n_rem ^= (unsigned short)(words[cnt >> 1] >> 8);
+        }
+
+        for (int n_bit = 8; n_bit > 0; n_bit--) {
+            if (n_rem & 0x8000) {
+                n_rem = (n_rem << 1) ^ 0x3000;
+            } else {
+                n_rem = (n_rem << 1);
+            }
+        }
+    }
+
+    n_rem = 0x000F & (n_rem >> 12);
+    return (uint8_t)n_rem;
+}
+
 /* --- Public API ----------------------------------------------------------- */
 
 MS5607StateTypeDef MS5607_Init(SPI_HandleTypeDef *hspi, GPIO_TypeDef *csPort, uint16_t csPin)
@@ -100,6 +131,13 @@ MS5607StateTypeDef MS5607_Init(SPI_HandleTypeDef *hspi, GPIO_TypeDef *csPort, ui
 
     /* Sanity-check: at least one calibration word must be non-zero */
     if (_prom.sens == 0 && _prom.off == 0 && _prom.tcs == 0) {
+        return MS5607_STATE_FAILED;
+    }
+
+    /* CRC check */
+    uint8_t read_crc = _prom.crc & 0x000F;
+    uint8_t calc_crc = MS5607_CRC4(&_prom);
+    if (read_crc != calc_crc) {
         return MS5607_STATE_FAILED;
     }
 
