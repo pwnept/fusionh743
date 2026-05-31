@@ -8,5 +8,5 @@
 ../Core/Src/MS5607SPI.c:250:8:MS5607GetTemperatureC	1
 ../Core/Src/MS5607SPI.c:255:9:MS5607GetPressurePa	1
 ../Core/Src/MS5607SPI.c:260:6:MS5607SetTemperatureOSR	1
-../Core/Src/MS5607SPI.c:265:8:MS5607GetAltitudeM	1
-../Core/Src/MS5607SPI.c:276:6:MS5607SetPressureOSR	1
+../Core/Src/MS5607SPI.c:265:8:MS5607GetAltitudeM	2
+../Core/Src/MS5607SPI.c:279:6:MS5607SetPressureOSR	1

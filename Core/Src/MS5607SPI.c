@@ -270,6 +270,9 @@ double MS5607GetAltitudeM(void) {
 	    const double EXPONENT = 5.2558;    /* g*M / (R*L) — dimensionless            */
 
 	    double pressure_pa = (double)_readings.pressure;  /* use internal sensor state */
+	    if (pressure_pa < 0.0) {
+	        pressure_pa = 0.0;
+	    }
 	    double altitude    = (T0 / L) * (1.0 - pow((pressure_pa / P0), (1.0 / EXPONENT)));
 	    return altitude;
 }

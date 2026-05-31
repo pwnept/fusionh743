@@ -157,18 +157,26 @@ int main(void)
 
   //sd init
   HAL_Delay(100);
-   if (f_mount(&SDFatFs, "", 1) == FR_OK) {
-       if (f_open(&LogFile, "BUNDLE_LOG.CSV", FA_OPEN_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
-           f_lseek(&LogFile, f_size(&LogFile));
-           if (f_size(&LogFile) == 0) {
-               const char *hdr = "timestamp_ms,pressure_pa,temperature_c,altitude_m,servo_deg\r\n";
-               UINT bw;
-               f_write(&LogFile, hdr, strlen(hdr), &bw);
-               f_sync(&LogFile);
-           }
-           sdReady = 1;
-       }
-   }
+  if (f_mount(&SDFatFs, "", 1) == FR_OK) {
+      if (f_open(&LogFile, "BUNDLE_LOG.CSV", FA_OPEN_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
+          f_lseek(&LogFile, f_size(&LogFile));
+          if (f_size(&LogFile) == 0) {
+              const char *hdr = "timestamp_ms,pressure_pa,temperature_c,altitude_m,servo_deg\r\n";
+              UINT bw;
+              f_write(&LogFile, hdr, strlen(hdr), &bw);
+              f_sync(&LogFile);
+          }
+          sdReady = 1;
+          const char *msg = "[SD] Initialized successfully. Logging active.\r\n";
+          HAL_UART_Transmit(&huart2, (uint8_t *)msg, (uint16_t)strlen(msg), HAL_MAX_DELAY);
+      } else {
+          const char *msg = "[SD] Failed to open BUNDLE_LOG.CSV.\r\n";
+          HAL_UART_Transmit(&huart2, (uint8_t *)msg, (uint16_t)strlen(msg), HAL_MAX_DELAY);
+      }
+  } else {
+      const char *msg = "[SD] Failed to mount volume.\r\n";
+      HAL_UART_Transmit(&huart2, (uint8_t *)msg, (uint16_t)strlen(msg), HAL_MAX_DELAY);
+  }
 
   /* USER CODE END 2 */
 
@@ -197,43 +205,42 @@ int main(void)
                             liveTelemetry.altitude_m,
                             (double)liveTelemetry.servo_deg
                             );
-         if (len > 0) {
-             HAL_UART_Transmit(&huart2, (uint8_t *)uartTxBuffer, (uint16_t)len, HAL_MAX_DELAY);
-         }
+      if (len > 0) {
+          HAL_UART_Transmit(&huart2, (uint8_t *)uartTxBuffer, (uint16_t)len, HAL_MAX_DELAY);
+      }
 
+      //sd
+      if (sdReady) {
+          UINT bw;
+          int sdLen = snprintf(sdWriteBuffer, sizeof(sdWriteBuffer),
+                               "%lu,%ld,%.2f,%.2f,%.2f\r\n",
+                               liveTelemetry.timestamp,
+                               liveTelemetry.pressure_pa,
+                               liveTelemetry.temperature_c,
+                               liveTelemetry.altitude_m,
+                               (double)liveTelemetry.servo_deg);
+          FRESULT res = f_write(&LogFile, sdWriteBuffer, (UINT)sdLen, &bw);
+          if (res != FR_OK || bw < (UINT)sdLen) {
+              sdReady = 0;
+              const char *msg = "[SD] Write failed. Logging disabled.\r\n";
+              HAL_UART_Transmit(&huart2, (uint8_t *)msg, (uint16_t)strlen(msg), HAL_MAX_DELAY);
+          } else {
+              f_sync(&LogFile);
+          }
+      }
 
-         //sd
-         if (sdReady) {
-               UINT bw;
-               int sdLen = snprintf(sdWriteBuffer, sizeof(sdWriteBuffer),
-                                    "%lu,%ld,%.2f,%.2f,%.2f\r\n",
-                                    liveTelemetry.timestamp,
-                                    liveTelemetry.pressure_pa,
-                                    liveTelemetry.temperature_c,
-                                    liveTelemetry.altitude_m,
-                                    (double)liveTelemetry.servo_deg);
-               f_write(&LogFile, sdWriteBuffer, (UINT)sdLen, &bw);
-               f_sync(&LogFile);
-           }
+      //servo
+      float servoMin =   27.0f, servoMax = 140.0f;
+      static float servoPos = 27.0f;
+      static float servoDir = 1.0f;
+      float step = (servoMax - servoMin) / 40.0f;
+      servoPos += servoDir * step;
+      if (servoPos >= servoMax) { servoPos = servoMax; servoDir = -1.0f; }
+      if (servoPos <= servoMin) { servoPos = servoMin; servoDir =  1.0f; }
+      liveTelemetry.servo_deg = servoPos;
+      servoSetAngle(servoPos);
 
-         //servo
-         float servoMin =   27.0f, servoMax = 140.0f;
-         static float servoPos = 0.0f;
-         static float servoDir = 1.0f;
-         float step = (servoMax - servoMin) / 40.0f;
-  	 	servoPos += servoDir * step;
-         if (servoPos >= servoMax) { servoPos = servoMax; servoDir = -1.0f; }
-         if (servoPos <= servoMin) { servoPos = servoMin; servoDir =  1.0f; }
-         liveTelemetry.servo_deg = servoPos;
-         servoSetAngle(servoPos);
-         // 	 	liveTelemetry.servo_deg = servoMin;
-         //        servoSetAngle(servoMin);
-
-         // 	 	liveTelemetry.servo_deg = servoMax;
-         //        servoSetAngle(servoMax);
-
-
-          HAL_Delay(100);
+      HAL_Delay(100);
 
   }
   /* USER CODE END 3 */
